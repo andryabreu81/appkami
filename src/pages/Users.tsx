@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
+import { Edit, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 const UsersPage = () => {
   const [users, setUsers] = useState<any[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
@@ -19,8 +22,15 @@ const UsersPage = () => {
       .catch(err => console.log('Backend no conectado aún', err));
   };
 
+  const fetchRoles = () => {
+    api.get('/getroles')
+      .then(res => setRoles(res.data.data || []))
+      .catch(err => console.log('Error al obtener roles', err));
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -59,26 +69,59 @@ const UsersPage = () => {
           delete payload.password; // Si no escribe contraseña nueva, no la enviamos
         }
         await api.put('/updateuser', payload);
+        Swal.fire('¡Actualizado!', 'El usuario ha sido actualizado correctamente.', 'success');
       } else {
         await api.post('/addusers', formData);
+        Swal.fire('¡Agregado!', 'El usuario ha sido agregado correctamente.', 'success');
       }
       setIsModalOpen(false);
       fetchUsers(); // Recargamos la tabla
     } catch (error) {
       console.error("Error al guardar el usuario", error);
-      alert("Ocurrió un error al guardar el usuario");
+      Swal.fire('Error', 'Ocurrió un error al guardar el usuario', 'error');
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm("¿Estás seguro de que deseas eliminar este usuario?")) {
+    const result = await Swal.fire({
+      title: '¿Estás seguro?',
+      text: "¡El usuario será eliminado permanentemente!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#ef4444',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
       try {
         await api.delete(`/deleteuser/${id}`);
         fetchUsers();
+        Swal.fire('¡Eliminado!', 'El usuario ha sido eliminado.', 'success');
       } catch (error) {
         console.error("Error al eliminar usuario", error);
-        alert("Ocurrió un error al eliminar el usuario");
+        Swal.fire('Error', 'Ocurrió un error al eliminar el usuario', 'error');
       }
+    }
+  };
+
+  const handleToggleActive = async (user: any) => {
+    const newActiveStatus = user.active === 1 ? 0 : 1;
+    try {
+      await api.put('/updateuser', { userId: user.id, active: newActiveStatus });
+      fetchUsers();
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        icon: 'success',
+        title: 'Estado actualizado'
+      });
+    } catch (error) {
+      console.error("Error al actualizar estado", error);
+      Swal.fire('Error', 'Ocurrió un error al actualizar el estado del usuario', 'error');
     }
   };
 
@@ -113,16 +156,30 @@ const UsersPage = () => {
                 <td>{u.email}</td>
                 <td>{u.role?.descripcion || 'Sin rol'}</td>
                 <td>
-                  <span className={u.active === 1 ? 'badge badge-success' : 'badge badge-danger'}>
+                  <button
+                    onClick={() => handleToggleActive(u)}
+                    className={u.active === 1 ? 'badge badge-success' : 'badge badge-danger'}
+                    style={{
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 10px',
+                      fontFamily: 'inherit'
+                    }}
+                    title={u.active === 1 ? 'Desactivar' : 'Activar'}
+                  >
+                    {u.active === 1 ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
                     {u.active === 1 ? 'Activo' : 'Inactivo'}
-                  </span>
+                  </button>
                 </td>
                 <td style={{ display: 'flex', gap: '8px' }}>
-                  <button className="glass-button" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={() => openEditModal(u)}>
-                    Editar
+                  <button className="glass-button" style={{ padding: '4px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={() => openEditModal(u)} title="Editar">
+                    <Edit size={14} /> Editar
                   </button>
-                  <button className="glass-button" style={{ padding: '4px 10px', fontSize: '12px', borderColor: '#ef4444', color: '#ef4444' }} onClick={() => handleDelete(u.id)}>
-                    Eliminar
+                  <button className="glass-button" style={{ padding: '4px 10px', fontSize: '12px', borderColor: '#ef4444', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }} onClick={() => handleDelete(u.id)} title="Eliminar">
+                    <Trash2 size={14} /> Eliminar
                   </button>
                 </td>
               </tr>
@@ -156,8 +213,14 @@ const UsersPage = () => {
                 <input style={inputStyle} type="email" name="email" value={formData.email} onChange={handleInputChange} required />
               </div>
               <div>
-                <label style={labelStyle}>ID del Rol</label>
-                <input style={inputStyle} type="number" name="role_id" value={formData.role_id} onChange={handleInputChange} required />
+                <label style={labelStyle}>Rol del Usuario</label>
+                {/* <input style={inputStyle} type="number" name="role_id" value={formData.role_id} onChange={handleInputChange} required /> */}
+                <select name="role_id" id="" value={formData.role_id} onChange={handleInputChange} style={inputStyle} required >
+                  <option value="">Seleccione..</option>
+                  {roles.map(r => (
+                    <option key={r.id} value={r.id}>{r.descripcion}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label style={labelStyle}>{editingId ? 'Nueva Contraseña (opcional)' : 'Contraseña'}</label>
