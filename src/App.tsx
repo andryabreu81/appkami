@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { Users, Building2, Landmark, ShieldCheck, LogOut } from 'lucide-react';
+import Swal from 'sweetalert2';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import UsersPage from './pages/Users';
@@ -30,6 +31,25 @@ const Layout = () => {
 
   const isActive = (path: string) => location.pathname === path ? 'active' : '';
 
+  const handleLogout = () => {
+    Swal.fire({
+      title: '¿Estás seguro?',
+      text: 'Estás a punto de cerrar sesión',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Sí, cerrar sesión',
+      cancelButtonText: 'Cancelar',
+      background: '#1a1a1a',
+      color: '#fff'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        logout();
+      }
+    });
+  };
+
   return (
     <div className="app-container">
       <nav className="sidebar glass-panel">
@@ -52,7 +72,7 @@ const Layout = () => {
         </Link>
 
         <div style={{ flex: 1 }}></div>
-        <button className="nav-item" onClick={logout} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#f87171' }}>
+        <button className="nav-item" onClick={handleLogout} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#f87171' }}>
           <LogOut size={20} /> Cerrar Sesión
         </button>
       </nav>
